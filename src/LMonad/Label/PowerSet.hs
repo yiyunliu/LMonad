@@ -7,7 +7,7 @@ import Prelude
 import LMonad
 
 -- | Power set label made of all combinations of the principals. 
-data Ord p => PSLabel p = PSLabel {
+data PSLabel p = PSLabel {
         psLabelConfidentiality :: Set p
       , psLabelIntegrity :: Set p
     }
@@ -51,6 +51,7 @@ instance Ord p => Label (PSLabel p) where
     -- Bottom
     bottom = 
         PSLabel Set.empty Set.empty
+
 
 -- | Type alias for labeled power sets.
 type PSLabeled p = Labeled (PSLabel p)

@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-@ LIQUID "--reflection"  @-}
 -- Some work derived from [LIO](http://hackage.haskell.org/package/lio-eci11), copyrighted under GPL.
 --
 -- Modifications by James Parker in 2014.
@@ -254,7 +253,7 @@ setCurrentLabelTCB l = do
 data Labeled l a = Labeled {
         labeledLabel :: l
       , labeledValue :: a
-    }
+    } deriving (Show)
 
 -- fullEraseLabel :: (Erasure l a, Label l) => l -> l -> a -> LMonadT l Maybe (ErasableD (Labeled l a))
 -- fullEraseLabel l ll lv = do
