@@ -71,9 +71,11 @@ library
     , deepseq
     , enclosed-exceptions
     , exceptions
-    , monad-control >= 1.0.0.0
+    , monad-control
     , transformers
     , transformers-base
+    , free
+    , tagged
   
 Test-Suite test-lmonad
   type:
@@ -92,11 +94,24 @@ Test-Suite test-lmonad
     , monad-control
     , transformers
     , transformers-base
+    , deepseq
+    , enclosed-exceptions
   extensions:
       DoAndIfThenElse
       MultiParamTypeClasses
   ghc-options:
       -Wall
+
+
+test-suite test-liquid-label
+  default-language:  Haskell98
+  build-depends:     base, process, liquidhaskell
+  type:              exitcode-stdio-1.0
+  other-modules :    RunLiquid
+  hs-source-dirs:    liquid-tests
+  ghc-options:       -W -Werror
+  main-is:           Label.hs
+
 
 source-repository head
   type:              git

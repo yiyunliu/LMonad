@@ -1,20 +1,27 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-4.0
+resolver: lts-13.14
 
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+  - git: https://github.com/ucsd-progsys/liquidhaskell
+    commit: c37bc9397d6fd03fcff2e1130060dd9b4bee2576
+  - git: https://github.com/ucsd-progsys/liquid-fixpoint
+    commit: c47a4df6c02193882b8881ed968a13fa6d69b993
+
+
 
 # Override default flag values for local packages and extra-deps
 flags: {}
 
 # Extra package databases containing global packages
 extra-package-dbs: []
+
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

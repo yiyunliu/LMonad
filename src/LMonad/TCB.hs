@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-@ LIQUID "--reflection"  @-}
 -- Some work derived from [LIO](http://hackage.haskell.org/package/lio-eci11), copyrighted under GPL.
 --
 -- Modifications by James Parker in 2014.
@@ -36,7 +38,6 @@ module LMonad.TCB (
       , ToLabel(..)
       , swapBase
     ) where
-
 import Control.Applicative
 import Control.Exception.Base
 import Control.Exception.Enclosed
@@ -60,7 +61,7 @@ class Monad m => LMonad m where
 
 data Lattice = Top | Bottom
 
-data Label l => LState l = LState {
+data LState l = LState {
         _lStateLabel :: !l
       , _lStateClearance :: !l
     }
@@ -71,7 +72,7 @@ class ToLabel t l where
     toIntegrityLabel :: t -> l
 
 -- Transformer monad that wraps the underlying monad and keeps track of information flow. 
-data (Label l, Monad m, LMonad m) => LMonadT l m a = LMonadT {
+data LMonadT l m a = LMonadT {
         lMonadTState :: (StateT (LState l) m a)
     }
 
@@ -111,9 +112,13 @@ instance (LMonad m, Label l, MonadBaseControl IO m) => MonadBaseControl IO (LMon
     liftBaseWith f = LMonadT $ liftBaseWith $ \run -> f $ liftM StMT . run . lMonadTState
     restoreM = LMonadT . restoreM . unStMT
 
+
+
+instance (LMonad m, Label l, Semigroup (m a)) => Semigroup (LMonadT l m a) where
+    a <> b = a >> b
+
 instance (LMonad m, Label l, Monoid (m a)) => Monoid (LMonadT l m a) where
     mempty = lLift mempty
-    mappend a b = a >> b 
 --    do
 --        a' <- a 
 --        b' <- b
@@ -143,6 +148,21 @@ lLift ma = LMonadT $ do
         lift ma
     else
         lift lFail
+
+
+-- fullEraseGetCurrentLabel :: (Label l) => l -> LMonadT l Maybe l
+-- fullEraseGetCurrentLabel l = do
+--   eraseCheckPoint l
+--   lc <- getCurrentLabel
+--   eraseCheckPoint l
+--   return lc
+
+-- postEraseGetCurrentLabel :: (Label l) => l -> LMonadT l Maybe l
+-- postEraseGetCurrentLabel l = do
+--   lc <- getCurrentLabel
+--   eraseCheckPoint l
+--   return lc
+
 
 getCurrentLabel :: (Label l, LMonad m) => LMonadT l m l
 getCurrentLabel = LMonadT $ do
@@ -231,10 +251,22 @@ setCurrentLabelTCB l = do
     LMonadT $ put $ LState l c
 
 -- Labeled values.
-data Label l => Labeled l a = Labeled {
+data Labeled l a = Labeled {
         labeledLabel :: l
       , labeledValue :: a
     }
+
+-- fullEraseLabel :: (Erasure l a, Label l) => l -> l -> a -> LMonadT l Maybe (ErasableD (Labeled l a))
+-- fullEraseLabel l ll lv = do
+--   eraseCheckPoint l
+--   labeled <- label ll lv
+--   let εlabeled = erase l labeled
+--       -- Nothing??? or HOle??? does not type check
+--   eraseCheckPoint l
+--   return εlabeled
+
+
+
 
 label :: (Label l, LMonad m) => l -> a -> LMonadT l m (Labeled l a)
 label l a = LMonadT $ do
@@ -251,7 +283,155 @@ taintHelper l = do
         return $ Just l'
     else
         return Nothing
-        
+
+
+
+-- -- runLMonad :: (Label l, LMonad m) => LMonadT l m a -> m a
+
+-- eval :: (Label l) => l -> l -> LMonadT l Maybe a -> Maybe a
+-- eval l cl ma =  (runLMonadWith l cl ma)
+
+
+-- we can do similar things with free monad, but with foldFree to add
+-- checkpoint at every single place
+-- preErase :: (Label l, LMonad m)  => l -> LMonadT l m a -> LMonadT l m (Maybe a)
+-- preErase l ma = do
+--    -- lc <- getCurrentLabel
+--    -- if lc `canFlowTo` l
+--    -- then do a <- ma
+--    --         return (Just a)
+--    -- else return Nothing
+--   -- eraseCheckPoint l
+--   a <- ma
+--   return (Just a)
+
+-- postErase :: (Label l, LMonad m)  => l -> LMonadT l m a -> LMonadT l m (Maybe a)
+-- postErase l ma = do
+--    a <- ma
+--    -- eraseCheckPoint l
+--    return (Just a)
+--    -- lc <- getCurrentLabel
+--    -- if lc `canFlowTo` l
+--    -- then return (Just a)
+--    -- else return Nothing
+
+
+-- add the axiom that erase is idempotent
+-- {erase a == erase (erase a)}
+-- class (Label l) => Erasure l a  where
+--   type Erased l a
+--   erase :: l -> a -> ErasableD (Erased l a)
+  -- alternative
+  -- erase :: l -> a -> Erased l a
+  
+  -- erase  :: a -> Erasable/Maybe a
+  -- isHole :: a -> Bool
+
+
+
+-- instance (Erasable (Maybe a)) where
+--   erase _ = Nothing
+--   isHole (Just _) = False
+--   isHole Nothing = True
+
+-- instance (not (Erasable l a) Label l) =>
+
+
+-- instance (Erasure l a, Label l) => Erasure l ( (ErasableD (Labeled l a))) where
+--   erase l la@(Labeled ll a) = if ll `canFlowTo` l then ErasableD (Labeled ll (erase l a)) else Hole
+  -- join
+  -- 
+  
+  -- isHole = undefined
+  
+
+-- inlined, fully erased unlabel
+
+-- eraseCheckPoint :: (Label l) => l -> LMonadT l Maybe ()
+-- eraseCheckPoint l = do
+--   lc <- getCurrentLabel
+--   lLift (guard $ lc `canFlowTo` l)
+  
+-- 
+
+-- data ErasableD a = Hole | ErasableD a
+--   deriving (Functor)
+
+-- instance Monad ErasableD  where
+--   return = ErasableD
+--   m >>= f = join $ fmap f m
+--     where
+--       join (ErasableD (ErasableD a)) = ErasableD a
+--       join _ = Hole
+
+-- instance Applicative ErasableD where
+--   pure = return
+--   (<*>) = ap
+
+-- fullEraseUnlabel :: (Erasure l a, Label l) => l -> Labeled l a -> LMonadT l Maybe a
+-- fullEraseUnlabel l la@(Labeled ll lv) = do
+--   -- corresponds to the smallstep transitive closure in the flexible dynamic ... paper
+--   eraseCheckPoint l
+--   let εla = (erase la)
+--   v <- unlabel εla
+--   eraseCheckPoint l
+--   pure (erase v)
+  -- where-- if ll `canFlowTo` l then Labeled ll lv
+               -- else Labeled ll (erase lv) -- get into this branch => 
+                    -- ll can't flow to l =>
+                    -- lc `join` ll can't flow to l =>
+                    -- will fail at checkPoint anyways =>
+                    -- erasing Labeled is useless
+
+-- postEraseUnlabel :: (Erasure l a, Label l) => l -> Labeled l a -> LMonadT l Maybe a
+-- postEraseUnlabel l la = do
+--   v <- unlabel la
+--   checkPoint
+--   pure $ erase v
+--   where checkPoint = eraseCheckPoint l
+        -- erase' a = do
+        --   lc <- getCurrentLabel
+        --   if lc `canFlowTo` l
+        --     then erase a
+        --     else 
+
+{-@
+unlabelPseudoSimulation :: (Erasable a, Label l)
+=> l : l
+-> lc : l
+-> clc : l
+-> la : Labeled l a
+-> {eval lc clc (fullEraseUnlabel l la) == eval lc clc (postEraseUnlabel l la)}
+@-}
+-- unlabelPseudoSimulation :: (Erasure l a, Label l) =>
+--   l -> l -> l -> Labeled l a -> Proof
+-- unlabelPseudoSimulation l lc clc la = ()
+
+
+
+
+
+-- {-@
+-- unlabelNoninterference :: (label l)
+-- => l : l
+-- -> lc : l
+-- -> lc' : l
+-- -> clc : l
+-- -> labeled : Labeled l a
+-- -> ma : LMonadT l Identity a
+-- -> ma' : LMonadT l Identity a
+-- -> ((eval lc clc (preErase l (unlabel εlabeled))) ==  (eval lc' clc ?) ==>
+--     (eval lc clc (postErase l ma)) == (eval lc clc (postErase l ma')))
+-- @-}
+-- unlabelNoninterference :: (Label l) =>
+--   l -> Labeled l a -> LMonadT l Identity a -> LMonadT l Identity a -> Proof
+-- unlabelNoninterference l Labeled{labeledLabel = vl, labeledValue = v} ma mb = ()
+--   where εlabeled = if l `canFlowTo ` vl
+--                    then Just Labeled {labeledLabel = vl, labeledValue = v}
+--                    else Nothing
+
+
+
 unlabel :: (Label l, LMonad m) => Labeled l a -> LMonadT l m a
 unlabel l = do
     taintLabel $ labelOf l
@@ -259,6 +439,8 @@ unlabel l = do
 
     -- setLabel $ labelOf l
     -- return $ labeledValue l
+
+
 
 canUnlabel :: (Label l, LMonad m) => Labeled l a -> LMonadT l m Bool
 canUnlabel l = do
@@ -307,3 +489,13 @@ swapBase f (LMonadT m) = LMonadT $ do
     ( res, new) <- lift $ f $ (runStateT m) prev
     put new
     return res
+
+
+instance LMonad Maybe where
+  lFail = Nothing
+  lAllowLift = pure True
+
+
+-- instance LMonad Identity where
+--   lFail :: Identity a
+--   lFail = pure undefined
