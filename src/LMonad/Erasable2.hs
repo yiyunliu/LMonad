@@ -15,11 +15,11 @@ class (Label l) => Erasable l a where
   erase :: l -> a -> a
 
 
-instance (Label l) => Erasable l Int where
-  erase _ a = a
+-- instance (Label l) => Erasable l Int where
+--   erase _ a = a
 
-instance (Label l) => Erasable l () where
-  erase _ u = u
+-- instance (Label l) => Erasable l () where
+--   erase _ u = u
 
 
 -- Erasable a => Erasable (Labeled l a + 1)
@@ -29,6 +29,9 @@ instance (Label l, Erasable l a) => Erasable l (Maybe (Labeled l a)) where
     if l' `canFlowTo` l
       then pure (Labeled l' (erase l a))
       else Nothing
+
+instance {-# OVERLAPS #-} (Label l) => Erasable l a where
+  erase _ a = a
 
 instance Label () where
 
@@ -86,3 +89,8 @@ example2 = Just (Labeled Low (Just (Labeled High 100)))
 -- >>> Just (Labeled {labeledLabel = Low, labeledValue = Nothing})
 -- erase High example2
 -- >>> Just (Labeled {labeledLabel = Low, labeledValue = Just (Labeled {labeledLabel = High, labeledValue = 100})})
+
+example3 :: String
+example3 = erase Low "identity"
+
+
